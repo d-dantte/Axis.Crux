@@ -85,3 +85,4 @@ namespace Axis.Crux.MSBuildTarget
         }
     }
 }
+
