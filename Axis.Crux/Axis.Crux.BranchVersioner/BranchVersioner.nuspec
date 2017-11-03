@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>Axis.Crux.BranchVersioner</id>
+    <version>1.0.0-pre-6545433</version>
+    <authors>Axiis</authors>
+    <owners>Axiis</owners>
+    <projectUrl>https://github.com/d-dantte/Axis.Crux</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Adds MSBuild targets to C# projects that rewrite the AssemblyVersion and AssemblyFileVersion values depending on the most recent GitFlow "release-{version}" branch found.</description>
+    <releaseNotes></releaseNotes>
+    <copyright>Copyright 2017</copyright>
+    <tags>Assembly MSBuild Targets GitFlow Git Branch Version</tags>
+    <dependencies>
+    </dependencies>
+  </metadata>
+</package>
