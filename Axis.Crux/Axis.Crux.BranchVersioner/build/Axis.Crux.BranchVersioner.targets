@@ -5,8 +5,8 @@
       TaskName="Axis.Crux.MSBuildTarget.BranchVersioner"
       AssemblyFile="$(MSBuildThisFileDirectory)..\tools\Axis.Crux.MSBuildTarget.dll" />
 
-  <Target Name="AssemblyVersionWriter" BeforeTargets="CoreCompile">
-    <AssemblyVersionWriter MSBuildProjectDirectory="$(MSBuildProjectDirectory)"/>
+  <Target Name="BranchVersioner" BeforeTargets="CoreCompile">
+    <BranchVersioner MSBuildProjectDirectory="$(MSBuildProjectDirectory)"/>
   </Target>
 
 </Project>
