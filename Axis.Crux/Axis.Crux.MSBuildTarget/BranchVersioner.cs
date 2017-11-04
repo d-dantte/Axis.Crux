@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using LibGit2Sharp;
+using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 
 namespace Axis.Crux.MSBuildTarget
@@ -20,6 +21,9 @@ namespace Axis.Crux.MSBuildTarget
 
         public string MSBuildProjectDirectory { get; set; }
 
+        [Output]
+        public string ExtractedVersion { get; set; }
+
         public override bool Execute()
         {
             this.Log.LogMessage($@"Project Directory is: {MSBuildProjectDirectory}");
@@ -30,8 +34,7 @@ namespace Axis.Crux.MSBuildTarget
             //2. rewrite this projects AssemblyInfo.cs file
             WriteVersion(releaseVersion);
 
-            //3. Set the environment variable to be picked up by the nuget packager
-            SetEnvironmentVariable(releaseVersion);
+            ExtractedVersion = releaseVersion.ToString(false);
 
             return true;
         }
@@ -96,13 +99,6 @@ namespace Axis.Crux.MSBuildTarget
                 .JoinUsing("\n");
             
             new StreamWriter(new FileStream(assemblyInfoFile.FullName, FileMode.Create)).Using(_writer => _writer.Write(content)); //<-- disposes the writer
-        }
-
-        public void SetEnvironmentVariable(SemVer releaseVersion)
-        {
-            Log.LogMessage($"Setting Package version to Environment variable: {PackageVersionVariable} to {releaseVersion.ToString(false)}");
-            
-            Environment.SetEnvironmentVariable(PackageVersionVariable, releaseVersion.ToString(false), EnvironmentVariableTarget.Machine);
         }
     }
 }
