@@ -102,7 +102,7 @@ namespace Axis.Crux.MSBuildTarget
         {
             Log.LogMessage($"Setting Package version to Environment variable: {PackageVersionVariable} to {releaseVersion.ToString(false)}");
             
-            Environment.SetEnvironmentVariable(PackageVersionVariable, releaseVersion.ToString(false), EnvironmentVariableTarget.User);
+            Environment.SetEnvironmentVariable(PackageVersionVariable, releaseVersion.ToString(false), EnvironmentVariableTarget.Machine);
         }
     }
 }
