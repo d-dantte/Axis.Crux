@@ -44,7 +44,7 @@ namespace Axis.Crux.MSBuildTarget
             Log.LogMessage($@"Solution directory is: {solutionDirectory}");
 
             //1. get the last release branch merged into master
-            var main = gitRepo.Branches["master"];
+            var main = gitRepo.Branches["origin/master"];
             Log.LogMessage($@"Git master branch found: {main?.FriendlyName ?? "null"}");
 
             var releases = gitRepo
