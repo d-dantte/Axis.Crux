@@ -91,7 +91,7 @@ namespace Axis.Crux.MSBuildTarget
                 .Concat(new[]
                 {
                     $@"[assembly: AssemblyVersion(""{releaseVersion.ToString(true)}"")]",
-                    $@"[assembly: AssemblyFileVersion(""{releaseVersion.ToString(false)}"")]"
+                    $@"[assembly: AssemblyFileVersion(""{releaseVersion.ToString(true)}"")]"
                 })
                 .JoinUsing("\n");
             
@@ -100,7 +100,7 @@ namespace Axis.Crux.MSBuildTarget
 
         public void SetEnvironmentVariable(SemVer releaseVersion)
         {
-            Log.LogMessage($"Setting Package version to Environment variable: {PackageVersionVariable}");
+            Log.LogMessage($"Setting Package version to Environment variable: {PackageVersionVariable} to {releaseVersion.ToString(false)}");
 
             Environment.SetEnvironmentVariable(PackageVersionVariable, releaseVersion.ToString(false));
         }
