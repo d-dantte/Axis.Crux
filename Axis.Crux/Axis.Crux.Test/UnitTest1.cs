@@ -31,5 +31,16 @@ namespace Axis.Crux.Test
 
             Assert.IsTrue(regex.IsMatch(@"[assembly: AssemblyVersion(""2.1.2"")]"));
         }
+
+        [TestMethod]
+        public void TestMethod3()
+        {
+            var semver = new SemVer("1.2.32");
+            semver = new SemVer("1.2.32");
+            semver = new SemVer("1.2.32-5");
+            semver = new SemVer("1.2.32-pre-543");
+            semver = new SemVer("1.2.32.5");
+            semver = new SemVer("1.2.3 2 .5");
+        }
     }
 }

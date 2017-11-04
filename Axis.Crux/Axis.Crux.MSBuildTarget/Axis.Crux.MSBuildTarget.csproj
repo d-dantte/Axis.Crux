@@ -50,6 +50,7 @@
     <Compile Include="BranchVersioner.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SemVer.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
