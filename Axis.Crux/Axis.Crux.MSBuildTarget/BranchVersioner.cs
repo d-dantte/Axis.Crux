@@ -108,7 +108,7 @@ namespace Axis.Crux.MSBuildTarget
 
         public void WriteExternalTempFile(SemVer semver)
         {
-            var tempFileName = Path.Combine(MSBuildProjectDirectory, "version.tmp");
+            var tempFileName = Path.Combine(MSBuildProjectDirectory,"..", "version.tmp");
             Log.LogMessage($"Writing version to temp version file: {tempFileName}");
 
             new StreamWriter(new FileStream(tempFileName, FileMode.Create)).Using(_w => _w.Write(semver.ToString(false)));
