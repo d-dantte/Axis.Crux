@@ -26,7 +26,7 @@ namespace Axis.Crux.MSBuildTarget
 
         public override bool Execute()
         {
-            this.Log.LogMessage($@"Project Directory is: {MSBuildProjectDirectory}");
+            Log.LogMessage($@"Project Directory is: {MSBuildProjectDirectory}");
 
             //1. extract the version
             var releaseVersion = ExtractVersion();
@@ -35,6 +35,7 @@ namespace Axis.Crux.MSBuildTarget
             WriteVersion(releaseVersion);
 
             ExtractedVersion = releaseVersion.ToString(false);
+            Log.LogMessage($"TaskParameter 'ExtractedVersion' set to: {ExtractedVersion}");
 
             return true;
         }

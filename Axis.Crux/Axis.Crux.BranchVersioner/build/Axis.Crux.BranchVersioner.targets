@@ -9,6 +9,7 @@
     <BranchVersioner MSBuildProjectDirectory="$(MSBuildProjectDirectory)">
       <Output TaskParameter="ExtractedVersion" PropertyName="CruxVersion_AssemblyVersion" />
     </BranchVersioner>
+    <Messge Text="Exporting CruxVersion_AssemblyVersion as: $(CruxVersion_AssemblyVersion)"/>
   </Target>
 
 </Project>
