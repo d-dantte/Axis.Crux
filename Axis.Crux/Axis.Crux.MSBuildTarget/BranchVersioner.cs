@@ -111,9 +111,17 @@ namespace Axis.Crux.MSBuildTarget
             var tempFileName = Path.Combine(MSBuildProjectDirectory,"..", "version.tmp");
             Log.LogMessage($"Writing version to temp version file: {tempFileName}");
 
-            new StreamWriter(new FileStream(tempFileName, FileMode.Create)).Using(_w => _w.Write(semver.ToString(false)));
-
-            Log.LogMessage($"Done writing to temp version file");
+            var fileInfo = new FileInfo(tempFileName);
+            if (!fileInfo.Exists)
+            {
+                new StreamWriter(new FileStream(tempFileName, FileMode.Create)).Using(_w =>
+                {
+                    _w.Write(semver.ToString(false));
+                    _w.Flush();
+                });
+                Log.LogMessage($"Done writing to temp version file");
+            }
+            else Log.LogMessage("File already writen");
         }
     }
 }
