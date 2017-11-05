@@ -34,6 +34,10 @@ namespace Axis.Crux.MSBuildTarget
             //2. rewrite this projects AssemblyInfo.cs file
             WriteVersion(releaseVersion);
 
+            //3. write temp version file
+            WriteExternalTempFile(releaseVersion);
+
+            //4. output extracted version
             ExtractedVersion = releaseVersion.ToString(false);
             Log.LogMessage($"TaskParameter 'ExtractedVersion' set to: {ExtractedVersion}");
 
@@ -100,6 +104,16 @@ namespace Axis.Crux.MSBuildTarget
                 .JoinUsing("\n");
             
             new StreamWriter(new FileStream(assemblyInfoFile.FullName, FileMode.Create)).Using(_writer => _writer.Write(content)); //<-- disposes the writer
+        }
+
+        public void WriteExternalTempFile(SemVer semver)
+        {
+            var tempFileName = Path.Combine(MSBuildProjectDirectory, "version.tmp");
+            Log.LogMessage($"Writing version to temp version file: {tempFileName}");
+
+            new StreamWriter(new FileStream(tempFileName, FileMode.Create)).Using(_w => _w.Write(semver.ToString(false)));
+
+            Log.LogMessage($"Done writing to temp version file");
         }
     }
 }
