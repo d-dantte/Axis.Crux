@@ -29,22 +29,39 @@ namespace Axis.Crux.MSBuildTarget
             Log.LogMessage($@"Project Directory is: {MSBuildProjectDirectory}");
 
             //1. extract the version
-            var releaseVersion = ExtractVersion();
+            var branchName = AcquireMonitoredBranch();
 
-            //2. rewrite this projects AssemblyInfo.cs file
+            //2. extract the version
+            var releaseVersion = ExtractVersion(branchName);
+
+            //3. rewrite this projects AssemblyInfo.cs file
             WriteVersion(releaseVersion);
 
-            //3. write temp version file
+            //4. write temp version file
             WriteExternalTempFile(releaseVersion);
 
-            //4. output extracted version
+            //5. output extracted version
             ExtractedVersion = releaseVersion.ToString(false);
             Log.LogMessage($"TaskParameter 'ExtractedVersion' set to: {ExtractedVersion}");
 
             return true;
         }
 
-        public SemVer ExtractVersion()
+        public string AcquireMonitoredBranch()
+        {
+            var finfo = new FileInfo(Path.Combine(MSBuildProjectDirectory, "BranchVersioner.options"));
+            if (!finfo.Exists) return "origin/master";
+            else
+            {
+                return new StreamReader(finfo.OpenRead())
+                .Using(_reader => _reader.ReadLines()) //<-- disposes the reader
+                .FirstOrDefault(_line => _line.Trim().ToLower().StartsWith("build-branch"))
+                .Split('=')
+                .Pipe(_parts => _parts[1].Trim());
+            }
+        }
+
+        public SemVer ExtractVersion(string monitoredBranchName)
         => new Repository(new DirectoryInfo(Path.Combine(MSBuildProjectDirectory, "..")).FullName).Using(gitRepo =>
         {
             var solutionDirectory = new DirectoryInfo(Path.Combine(MSBuildProjectDirectory, ".."));
@@ -52,8 +69,8 @@ namespace Axis.Crux.MSBuildTarget
             Log.LogMessage($@"Solution directory is: {solutionDirectory}");
 
             //1. get the last release branch merged into master
-            var main = gitRepo.Branches["origin/master"];
-            Log.LogMessage($@"Git master branch found: {main?.FriendlyName ?? "null"}");
+            var monitored = gitRepo.Branches[monitoredBranchName];
+            Log.LogMessage($@"Git master branch found: {monitored?.FriendlyName ?? "null"}");
 
             var releases = gitRepo
                 .Branches
@@ -67,7 +84,7 @@ namespace Axis.Crux.MSBuildTarget
             if (releases.Length == 0)
                 return new SemVer($"0.0.0-{now.ToString("yyyyMMdd")}-{milliseconds}");
 
-            var recentRelease = main
+            var recentRelease = monitored
                 .Commits
                 .Select(_c => new
                 {

@@ -36,5 +36,10 @@ namespace Axis.Crux.MSBuildTarget
         }
 
         public static string JoinUsing(this IEnumerable<string> sequence, string separator) => string.Join(separator, sequence);
+
+        public static R Pipe<V, R>(this V value, Func<V, R> pipe)
+        {
+            return pipe.Invoke(value);
+        }
     }
 }

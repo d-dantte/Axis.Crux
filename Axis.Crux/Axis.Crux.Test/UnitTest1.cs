@@ -16,7 +16,7 @@ namespace Axis.Crux.Test
                 MSBuildProjectDirectory = @"C:\_dev\Cyberspace\Projects\FinTech\PayProcessor\Repos\Core\PayProcessor.Core"
             };
 
-            var version = bv.ExtractVersion();
+            var version = bv.ExtractVersion("origin/master");
             Console.WriteLine(version);
             Assert.IsNotNull(version);
 
