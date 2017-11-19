@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using Axis.Crux.MSBuildTarget;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -13,14 +14,13 @@ namespace Axis.Crux.Test
         {
             var bv = new BranchVersioner
             {
-                MSBuildProjectDirectory = @"C:\_dev\Cyberspace\Projects\FinTech\PayProcessor\Repos\Core\PayProcessor.Core"
+                ProjectDirectory = @"C:\_dev\Cyberspace\Projects\FinTech\PayProcessor\Repos\Core\PayProcessor.Core",
+                AssemblyName = "PayProcessor.Core",
+                ProjectName = "PayProcessor.Core",
+                OutputPath = "bin/debug"
             };
 
-            var version = bv.ExtractVersion("origin/master");
-            Console.WriteLine(version);
-            Assert.IsNotNull(version);
-
-            bv.WriteVersion(version);
+            bv.UpdateNuspec(new SemVer { Major = 1, Minor = 1, Patch = 4 });
         }
 
         [TestMethod]
@@ -41,6 +41,15 @@ namespace Axis.Crux.Test
             semver = new SemVer("1.2.32-pre-543");
             semver = new SemVer("1.2.32.5");
             semver = new SemVer("1.2.3 2 .5");
+        }
+
+        [TestMethod]
+        public void TestMethod4()
+        {
+            var xml = @"<root><e1><e2><e3/></e2></e1></root>";
+
+            var xdoc = XDocument.Parse(xml);
+            var elt = xdoc.Element("root").Element("brach");
         }
     }
 }

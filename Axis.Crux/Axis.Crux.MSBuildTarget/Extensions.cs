@@ -41,5 +41,9 @@ namespace Axis.Crux.MSBuildTarget
         {
             return pipe.Invoke(value);
         }
+        public static void Pipe<V>(this V value, Action<V> pipe)
+        {
+            pipe.Invoke(value);
+        }
     }
 }

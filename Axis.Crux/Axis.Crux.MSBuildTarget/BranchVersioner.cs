@@ -2,9 +2,10 @@
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using LibGit2Sharp;
-using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
+using Newtonsoft.Json;
 
 namespace Axis.Crux.MSBuildTarget
 {
@@ -16,60 +17,54 @@ namespace Axis.Crux.MSBuildTarget
         public static readonly Regex AssemblyInfoPattern = new Regex(@"\[\s*assembly\s*\:\s+AssemblyVersion\s*\(\s*\""\s*\d+(\.\d+){2}[^""]*\""\s*\)\s*\]");
         public static readonly Regex AssemblyFileInfoPattern = new Regex(@"\[\s*assembly\s*\:\s+AssemblyFileVersion\s*\(\s*\""\s*\d+(\.\d+){2}[^""]*\""\s*\)\s*\]");
 
-        public static readonly string PackageVersionVariable = "CI_Version";
+        private Options Options { get; set; }
+        
+        public string ProjectDirectory { get; set; }
+        public string ProjectName { get; set; }
+        public string OutputPath { get; set; }
+        public string AssemblyName { get; set; }
 
-
-        public string MSBuildProjectDirectory { get; set; }
-
-        [Output]
-        public string ExtractedVersion { get; set; }
 
         public override bool Execute()
         {
-            Log.LogMessage($@"Project Directory is: {MSBuildProjectDirectory}");
+            Log.LogMessage($@"Project Directory is: {ProjectDirectory}");
 
-            //1. extract the version
-            var branchName = AcquireMonitoredBranch();
+            //1. Extract the options file
+            AcquireOptions();
 
             //2. extract the version
-            var releaseVersion = ExtractVersion(branchName);
+            var releaseVersion = ExtractVersion();
 
             //3. rewrite this projects AssemblyInfo.cs file
-            WriteVersion(releaseVersion);
+            WriteAssemblyVersion(releaseVersion);
 
-            //4. write temp version file
-            WriteExternalTempFile(releaseVersion);
-
-            //5. output extracted version
-            ExtractedVersion = releaseVersion.ToString(false);
-            Log.LogMessage($"TaskParameter 'ExtractedVersion' set to: {ExtractedVersion}");
+            //4. modify nuspec file
+            UpdateNuspec(releaseVersion);
 
             return true;
         }
 
-        public string AcquireMonitoredBranch()
+        public void AcquireOptions()
         {
-            var finfo = new FileInfo(Path.Combine(MSBuildProjectDirectory, "BranchVersioner.options"));
-            if (!finfo.Exists) return "origin/master";
+            var optionFile = new FileInfo(Path.Combine(ProjectDirectory, "BranchVersioner.json"));
+            if (!optionFile.Exists) Options = new Options { BuildBranch = "origin/master" };
             else
             {
-                return new StreamReader(finfo.OpenRead())
-                .Using(_reader => _reader.ReadLines()) //<-- disposes the reader
-                .FirstOrDefault(_line => _line.Trim().ToLower().StartsWith("build-branch"))
-                .Split('=')
-                .Pipe(_parts => _parts[1].Trim());
+                Options = new StreamReader(optionFile.OpenRead())
+                    .Using(_reader => _reader.ReadToEnd())
+                    .Pipe(JsonConvert.DeserializeObject<Options>);
             }
         }
 
-        public SemVer ExtractVersion(string monitoredBranchName)
-        => new Repository(new DirectoryInfo(Path.Combine(MSBuildProjectDirectory, "..")).FullName).Using(gitRepo =>
+        public SemVer ExtractVersion()
+        => new Repository(new DirectoryInfo(Path.Combine(ProjectDirectory, "..")).FullName).Using(gitRepo =>
         {
-            var solutionDirectory = new DirectoryInfo(Path.Combine(MSBuildProjectDirectory, ".."));
+            var solutionDirectory = new DirectoryInfo(Path.Combine(ProjectDirectory, ".."));
 
             Log.LogMessage($@"Solution directory is: {solutionDirectory}");
 
             //1. get the last release branch merged into master
-            var monitored = gitRepo.Branches[monitoredBranchName];
+            var monitored = gitRepo.Branches[Options.BuildBranch];
             Log.LogMessage($@"Git master branch found: {monitored?.FriendlyName ?? "null"}");
 
             var releases = gitRepo
@@ -105,9 +100,9 @@ namespace Axis.Crux.MSBuildTarget
             return new SemVer(releaseVersion);
         });
 
-        public void WriteVersion(SemVer releaseVersion)
+        public void WriteAssemblyVersion(SemVer releaseVersion)
         {
-            var assemblyInfoFile = new FileInfo(Path.Combine(MSBuildProjectDirectory, "Properties", "AssemblyInfo.cs"));
+            var assemblyInfoFile = new FileInfo(Path.Combine(ProjectDirectory, "Properties", "AssemblyInfo.cs"));
 
             var content = new StreamReader(assemblyInfoFile.OpenRead())
                 .Using(_reader => _reader.ReadLines()) //<-- disposes the reader
@@ -116,30 +111,105 @@ namespace Axis.Crux.MSBuildTarget
                 .Concat(new[]
                 {
                     $@"[assembly: AssemblyVersion(""{releaseVersion.ToString(true)}"")]",
-                    $@"[assembly: AssemblyFileVersion(""{releaseVersion.ToString(true)}"")]"
+                    $@"[assembly: AssemblyFileVersion(""{releaseVersion.ToString(true)}"")]",
+                    Environment.NewLine
                 })
-                .JoinUsing("\n");
+                .JoinUsing(Environment.NewLine);
             
             new StreamWriter(new FileStream(assemblyInfoFile.FullName, FileMode.Create)).Using(_writer => _writer.Write(content)); //<-- disposes the writer
         }
 
-        public void WriteExternalTempFile(SemVer semver)
+        public void UpdateNuspec(SemVer releaseVersion)
         {
-            var tempFileName = Path.Combine(MSBuildProjectDirectory,"..", "version.tmp");
-            Log.LogMessage($"Writing version to temp version file: {tempFileName}");
-
-            var fileInfo = new FileInfo(tempFileName);
-            if (!fileInfo.Exists)
+            var nuspecFile = new FileInfo(Path.Combine(ProjectDirectory, $"{ProjectName}.nuspec"));
+            if (nuspecFile.Exists)
             {
-                new StreamWriter(new FileStream(tempFileName, FileMode.Create)).Using(_w =>
+                var nuspec = nuspecFile
+                    .OpenRead()
+                    .Using(XDocument.Load);
+
+                //update the Id
+                nuspec
+                    .Element("package")
+                    .Element("metadata")
+                    .Element("id")
+                    .Value = ProjectName;
+
+                //update the version
+                Log.LogMessage($"Nuspec file found! Modifying version...");
+                nuspec
+                    .Element("package")
+                    .Element("metadata")
+                    .Element("version")
+                    .Value = releaseVersion.ToString();
+
+                //validate dependencies. Note that for now, only package.config projects are supported.
+                var packageFile = new FileInfo(Path.Combine(ProjectDirectory, $"packages.config"));
+                if (packageFile.Exists)
                 {
-                    _w.Write(semver.ToString(false));
-                    _w.Flush();
-                });
-                Log.LogMessage($"Done writing to temp version file");
+                    Log.LogMessage($"package.config found! Now verifying dependencies...");
+                    var package = packageFile
+                        .OpenRead()
+                        .Using(XDocument.Load);
+
+                    var nuspecDependeicies = nuspec
+                        .Element("package")
+                        .Element("metadata")
+                        .Element("dependencies");
+                    nuspecDependeicies?.RemoveNodes(); //clear it's children
+
+                    if(nuspecDependeicies==null)
+                        nuspec.Element("package").Element("metadata").Add(nuspecDependeicies = new XElement("dependencies"));
+
+                    //translate the packages to nuspec dependencies
+                    package
+                        .Element("packages")
+                        .Elements("package")
+                        .Select(_n =>
+                        {
+                            var dependency = new XElement("dependency");
+                            dependency.Add(new XAttribute("id", _n.Attribute("id").Value),
+                                           new XAttribute("version", _n.Attribute("version").Value));
+
+                            return dependency;
+                        })
+                        .Pipe(_dependencies => nuspecDependeicies.Add(_dependencies.ToArray()));
+                }
+
+                //add the library dll
+                var nuspecFiles = nuspec
+                    .Element("package")
+                    .Element("files");
+                nuspecFiles?.RemoveNodes();
+
+                if(nuspecFiles == null)
+                    nuspec.Element("package").Add(nuspecFiles = new XElement("files"));
+
+                if(Options.Includes?.Length > 0)
+                {
+                    Options.Includes
+                        .Select(_include =>
+                        {
+                            var file = new XElement("file");
+                            file.Add(new XAttribute("src", _include.Source),
+                                     new XAttribute("target", _include.TargetPath));
+                            if (!string.IsNullOrWhiteSpace(_include.Exclude))
+                                file.Add(new XAttribute("exclude", _include.Exclude));
+
+                            return file;
+                        })
+                        .Pipe(_files => nuspecFiles.Add(_files.ToArray()));
+                }
+
+                //finally, include the project's dll
+                var dll = new XElement("file");
+                dll.Add(new XAttribute("src", $@"{OutputPath}{AssemblyName}.dll"),
+                        new XAttribute("target", "lib"));
+                nuspecFiles.Add(dll);
+
+                Log.LogMessage($"Updating {ProjectName}.nuspec file...");
+                nuspec.Save(nuspecFile.FullName);
             }
-            else Log.LogMessage("File already writen");
         }
     }
 }
-

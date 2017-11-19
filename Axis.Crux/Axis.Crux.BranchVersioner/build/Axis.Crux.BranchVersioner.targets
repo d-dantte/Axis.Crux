@@ -6,8 +6,8 @@
       AssemblyFile="$(MSBuildThisFileDirectory)..\tools\Axis.Crux.MSBuildTarget.dll" />
 
   <Target Name="BranchVersioner" BeforeTargets="CoreCompile">
-    <BranchVersioner MSBuildProjectDirectory="$(MSBuildProjectDirectory)">
-      <Output TaskParameter="ExtractedVersion" PropertyName="CruxVersion_AssemblyVersion" />
+    <BranchVersioner ProjectDirectory="$(MSBuildProjectDirectory)" ProjectName="$(MSBuildProjectName)"
+                     OutputPath="$(OutputPath)" AssemblyName="$(AssemblyName)">
     </BranchVersioner>
   </Target>
 
