@@ -18,11 +18,13 @@ namespace Axis.Crux.MSBuildTarget
         public static readonly Regex AssemblyFileInfoPattern = new Regex(@"\[\s*assembly\s*\:\s+AssemblyFileVersion\s*\(\s*\""\s*\d+(\.\d+){2}[^""]*\""\s*\)\s*\]");
 
         private Options Options { get; set; }
+        private SemVer ReleaseSemVer { get; set; }
         
         public string ProjectDirectory { get; set; }
         public string ProjectName { get; set; }
         public string OutputPath { get; set; }
         public string AssemblyName { get; set; }
+        public string BuildConfiguration { get; set; }
 
 
         public override bool Execute()
@@ -33,13 +35,13 @@ namespace Axis.Crux.MSBuildTarget
             AcquireOptions();
 
             //2. extract the version
-            var releaseVersion = ExtractVersion();
+            ExtractVersion();
 
             //3. rewrite this projects AssemblyInfo.cs file
-            WriteAssemblyVersion(releaseVersion);
+            WriteAssemblyVersion();
 
             //4. modify nuspec file
-            UpdateNuspec(releaseVersion);
+            UpdateNuspec();
 
             return true;
         }
@@ -56,7 +58,7 @@ namespace Axis.Crux.MSBuildTarget
             }
         }
 
-        public SemVer ExtractVersion()
+        public void ExtractVersion()
         => new Repository(new DirectoryInfo(Path.Combine(ProjectDirectory, "..")).FullName).Using(gitRepo =>
         {
             var solutionDirectory = new DirectoryInfo(Path.Combine(ProjectDirectory, ".."));
@@ -77,30 +79,33 @@ namespace Axis.Crux.MSBuildTarget
             var milliseconds = new TimeSpan(0, now.Hour, now.Minute, now.Second, now.Millisecond).TotalMilliseconds;
 
             if (releases.Length == 0)
-                return new SemVer($"0.0.0-{now.ToString("yyyyMMdd")}-{milliseconds}");
+                ReleaseSemVer = new SemVer($"0.0.0-pre-{now.ToString("yyyyMMdd")}-{milliseconds}");
 
-            var recentRelease = monitored
-                .Commits
-                .Select(_c => new
-                {
-                    Release = releases.FirstOrDefault(_r => _r.Commits.First().Sha == _c.Sha),
-                    Commit = _c
-                })
-                .FirstOrDefault(_rr => _rr.Release != null);
+            else
+            {
+                var recentRelease = monitored
+                    .Commits
+                    .Select(_c => new
+                    {
+                        Release = releases.FirstOrDefault(_r => _r.Commits.First().Sha == _c.Sha),
+                        Commit = _c
+                    })
+                    .FirstOrDefault(_rr => _rr.Release != null);
 
-            Log.LogMessage($@"Release branch found: {recentRelease.Release?.FriendlyName ?? "null"}");
-            
+                Log.LogMessage($@"Release branch found: {recentRelease.Release?.FriendlyName ?? "null"}");
 
-            //2. extract the version number from it
-            var releaseVersion = recentRelease.Release?.FriendlyName.Substring("origin/release-".Length);
-            
-            if (PreReleaseVersion.IsMatch(releaseVersion))
-                releaseVersion = $"{ReleaseVersionTrimmer.Match(releaseVersion).Value}-{now.ToString("yyyyMMdd")}-{milliseconds}";
 
-            return new SemVer(releaseVersion);
+                //2. extract the version number from it
+                var releaseVersion = recentRelease.Release?.FriendlyName.Substring("origin/release-".Length);
+
+                if (PreReleaseVersion.IsMatch(releaseVersion))
+                    releaseVersion = $"{ReleaseVersionTrimmer.Match(releaseVersion).Value}-pre-{now.ToString("yyyyMMdd")}-{milliseconds}";
+
+                ReleaseSemVer = new SemVer(releaseVersion);
+            }
         });
 
-        public void WriteAssemblyVersion(SemVer releaseVersion)
+        public void WriteAssemblyVersion()
         {
             var assemblyInfoFile = new FileInfo(Path.Combine(ProjectDirectory, "Properties", "AssemblyInfo.cs"));
 
@@ -110,8 +115,8 @@ namespace Axis.Crux.MSBuildTarget
                 .Where(_line => !AssemblyInfoPattern.IsMatch(_line))
                 .Concat(new[]
                 {
-                    $@"[assembly: AssemblyVersion(""{releaseVersion.ToString(true)}"")]",
-                    $@"[assembly: AssemblyFileVersion(""{releaseVersion.ToString(true)}"")]",
+                    $@"[assembly: AssemblyVersion(""{ReleaseSemVer.ToString(true)}"")]",
+                    $@"[assembly: AssemblyFileVersion(""{ReleaseSemVer.ToString(true)}"")]",
                     Environment.NewLine
                 })
                 .JoinUsing(Environment.NewLine);
@@ -119,7 +124,7 @@ namespace Axis.Crux.MSBuildTarget
             new StreamWriter(new FileStream(assemblyInfoFile.FullName, FileMode.Create)).Using(_writer => _writer.Write(content)); //<-- disposes the writer
         }
 
-        public void UpdateNuspec(SemVer releaseVersion)
+        public void UpdateNuspec()
         {
             var nuspecFile = new FileInfo(Path.Combine(ProjectDirectory, $"{ProjectName}.nuspec"));
             if (nuspecFile.Exists)
@@ -141,7 +146,7 @@ namespace Axis.Crux.MSBuildTarget
                     .Element("package")
                     .Element("metadata")
                     .Element("version")
-                    .Value = releaseVersion.ToString();
+                    .Value = ReleaseSemVer.ToString();
 
                 //validate dependencies. Note that for now, only package.config projects are supported.
                 var packageFile = new FileInfo(Path.Combine(ProjectDirectory, $"packages.config"));
@@ -191,25 +196,39 @@ namespace Axis.Crux.MSBuildTarget
                         .Select(_include =>
                         {
                             var file = new XElement("file");
-                            file.Add(new XAttribute("src", _include.Source),
-                                     new XAttribute("target", _include.TargetPath));
+                            file.Add(new XAttribute("src", ResolveParams(_include.Source)),
+                                     new XAttribute("target", ResolveParams(_include.TargetPath)));
                             if (!string.IsNullOrWhiteSpace(_include.Exclude))
-                                file.Add(new XAttribute("exclude", _include.Exclude));
+                                file.Add(new XAttribute("exclude", ResolveParams(_include.Exclude)));
 
                             return file;
                         })
                         .Pipe(_files => nuspecFiles.Add(_files.ToArray()));
                 }
 
-                //finally, include the project's dll
-                var dll = new XElement("file");
-                dll.Add(new XAttribute("src", $@"{OutputPath}{AssemblyName}.dll"),
-                        new XAttribute("target", "lib"));
-                nuspecFiles.Add(dll);
+                //finally, include the project's dll if default copy is not overridden
+                if (!Options.IsDefaultAssemblyCopyOverridden)
+                {
+                    var dll = new XElement("file");
+                    dll.Add(new XAttribute("src", $@"{OutputPath}{AssemblyName}.dll"),
+                            new XAttribute("target", "lib"));
+                    nuspecFiles.Add(dll);
+                }
 
                 Log.LogMessage($"Updating {ProjectName}.nuspec file...");
                 nuspec.Save(nuspecFile.FullName);
             }
+        }
+
+        public string ResolveParams(string value)
+        {
+            return value?
+                .Replace($"$({nameof(ProjectDirectory)})", ProjectDirectory)
+                .Replace($"$({nameof(ProjectName)})", ProjectName)
+                .Replace($"$({nameof(OutputPath)})", OutputPath)
+                .Replace($"$({nameof(AssemblyName)})", AssemblyName)
+                .Replace($"$({nameof(BuildConfiguration)})", BuildConfiguration)
+                .Replace($"$(ReleaseVersion)", ReleaseSemVer.ToString());
         }
     }
 }
