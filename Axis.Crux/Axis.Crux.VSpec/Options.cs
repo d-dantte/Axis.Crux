@@ -7,7 +7,7 @@ namespace Axis.Crux.VSpec
         public PackageVersion[] Versions { get; set; }
         public FileInclusion[] Includes { get; set; }
 
-        public bool IsAutoAssemblyCopyDisabled { get; set; }
+        public bool? IsAutoAssemblyCopyEnabled { get; set; } = true;
 
         public PackageVersion MostRecentVersion() => Versions?.LastOrDefault() ?? new PackageVersion { Version = SemVer.PreGenesis };
     }

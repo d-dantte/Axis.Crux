@@ -15,7 +15,6 @@ namespace Axis.Crux.Test
         {
             var json = JsonConvert.SerializeObject(new Options
             {
-                IsAutoAssemblyCopyDisabled = true,
                 Versions = new[]
                 {
                     new PackageVersion

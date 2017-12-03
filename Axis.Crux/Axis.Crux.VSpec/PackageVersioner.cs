@@ -11,6 +11,9 @@ namespace Axis.Crux.VSpec
     {
         public static readonly JsonSerializerSettings JsonSerializerSettings = new JsonSerializerSettings
         {
+            NullValueHandling = NullValueHandling.Ignore,
+            DefaultValueHandling = DefaultValueHandling.Ignore,
+            MissingMemberHandling = MissingMemberHandling.Ignore,
             Converters = new List<JsonConverter>
             {
                 new SemVerConverter()
@@ -126,7 +129,7 @@ namespace Axis.Crux.VSpec
 
 
                 //finally, include the project's dll if auto-copy is not enabled
-                if (Options.IsAutoAssemblyCopyDisabled)
+                if (Options.IsAutoAssemblyCopyEnabled != false)
                 {
                     var dll = new XElement("file");
                     dll.Add(new XAttribute("src", $@"{OutputPath}{AssemblyName}.dll"),
