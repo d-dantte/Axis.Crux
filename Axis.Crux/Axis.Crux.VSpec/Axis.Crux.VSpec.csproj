@@ -59,7 +59,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Axis.Crux.VSpec.nuspec" />
-    <None Include="Axis.Crux.PackageVersioner.targets">
+    <None Include="Axis.Crux.VSpec.targets">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="packages.config" />
