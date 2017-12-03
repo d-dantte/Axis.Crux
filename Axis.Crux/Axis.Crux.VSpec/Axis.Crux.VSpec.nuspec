@@ -2,7 +2,7 @@
 <package >
   <metadata minClientVersion="2.8">
     <id>Axis.Crux.VSpec</id>
-    <version>1.0.0-pre-6546169</version>
+    <version>1.0.0-pre-6546175</version>
     <authors>Axiis</authors>
     <owners>Axiis</owners>
     <projectUrl>https://github.com/d-dantte/Axis.Crux</projectUrl>
