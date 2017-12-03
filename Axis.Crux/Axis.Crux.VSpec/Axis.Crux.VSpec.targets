@@ -6,12 +6,12 @@
       AssemblyFile="$(MSBuildThisFileDirectory)..\tools\Axis.Crux.VSpec.dll" />
 
   <Target Name="PackageVersioner" BeforeTargets="CoreCompile">
-    <BranchVersioner ProjectDirectory="$(MSBuildProjectDirectory)" 
+    <PackageVersioner ProjectDirectory="$(MSBuildProjectDirectory)" 
                      ProjectName="$(MSBuildProjectName)"
                      OutputPath="$(OutputPath)" 
                      AssemblyName="$(AssemblyName)" 
                      BuildConfiguration="$(Configuration)">
-    </BranchVersioner>
+    </PackageVersioner>
   </Target>
 
 </Project>
