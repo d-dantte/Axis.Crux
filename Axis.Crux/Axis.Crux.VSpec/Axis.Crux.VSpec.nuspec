@@ -8,8 +8,7 @@
     <projectUrl>https://github.com/d-dantte/Axis.Crux</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>
-      Adds MSBuild targets to C# projects that rewrite "version" tag of the $(ProjectName).nuspec file found at the root of the project's directory,
-      using the most recent version from the VSpec.json file also located at the root of the project.
+      Adds MSBuild targets to C# projects that rewrite "version" tag of the $(ProjectName).nuspec file found at the root of the project's directory, using the most recent version from the VSpec.json file also located at the root of the project.
     </description>
     <releaseNotes></releaseNotes>
     <copyright>Copyright 2017</copyright>
@@ -21,6 +20,6 @@
   <files>
     <file src="bin\Debug\Axis.Crux.VSpec.dll" target="tools" />
     <file src="bin\Debug\Newtonsoft.Json.dll" target="tools" />
-    <file src="bin\Debug\Axis.Crux.PackageVersioner.targets" target="build" />
+    <file src="bin\Debug\Axis.Crux.VSpec.targets" target="build" />
   </files>
 </package>
