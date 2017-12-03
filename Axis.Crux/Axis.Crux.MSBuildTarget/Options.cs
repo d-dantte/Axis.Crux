@@ -3,6 +3,7 @@
     public class Options
     {
         public string BuildBranch { get; set; }
+        public string GitRoot { get; set; }
         public bool IsDefaultAssemblyCopyOverridden { get; set; } = false;
         public FileInclusion[] Includes { get; set; }
     }

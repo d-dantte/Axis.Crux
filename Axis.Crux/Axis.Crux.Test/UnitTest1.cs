@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
-using Axis.Crux.MSBuildTarget;
+using Axis.Crux.VSpec;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Newtonsoft.Json;
 
 namespace Axis.Crux.Test
 {
@@ -12,15 +13,23 @@ namespace Axis.Crux.Test
         [TestMethod]
         public void TestMethod1()
         {
-            var bv = new BranchVersioner
+            var json = JsonConvert.SerializeObject(new Options
             {
-                ProjectDirectory = @"C:\_dev\Cyberspace\Projects\FinTech\PayProcessor\Repos\Core\PayProcessor.Core",
-                AssemblyName = "PayProcessor.Core",
-                ProjectName = "PayProcessor.Core",
-                OutputPath = "bin/debug"
-            };
+                IsAutoAssemblyCopyDisabled = true,
+                Versions = new[]
+                {
+                    new PackageVersion
+                    {
+                        Version = new SemVer("2.1.4")
+                    }
+                }
+            }, 
+            Formatting.Indented,
+            PackageVersioner.JsonSerializerSettings);
+            Console.WriteLine(json);
 
-            bv.UpdateNuspec(new SemVer { Major = 1, Minor = 1, Patch = 4 });
+            var options = JsonConvert.DeserializeObject<Options>(json, PackageVersioner.JsonSerializerSettings);
+            Console.WriteLine(options.ToString());
         }
 
         [TestMethod]
@@ -36,11 +45,16 @@ namespace Axis.Crux.Test
         public void TestMethod3()
         {
             var semver = new SemVer("1.2.32");
-            semver = new SemVer("1.2.32");
-            semver = new SemVer("1.2.32-5");
-            semver = new SemVer("1.2.32-pre-543");
-            semver = new SemVer("1.2.32.5");
-            semver = new SemVer("1.2.3 2 .5");
+            Console.WriteLine(semver);
+
+            semver = new SemVer("1.2.32-pre");
+            Console.WriteLine(semver);
+
+            semver = new SemVer("1.2.32-pre-543564");
+            Console.WriteLine(semver);
+
+            semver = new SemVer("1.2.32-pre-65456-6545-64-654356");
+            Console.WriteLine(semver);
         }
 
         [TestMethod]

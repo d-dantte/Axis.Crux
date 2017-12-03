@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>Axis.Crux.BranchVersioner</id>
-    <version>1.0.0-pre-6546155</version>
+    <version>1.0.0-pre-6546157</version>
     <authors>Axiis</authors>
     <owners>Axiis</owners>
     <projectUrl>https://github.com/d-dantte/Axis.Crux</projectUrl>
@@ -15,6 +15,7 @@
     <copyright>Copyright 2017</copyright>
     <tags>Assembly MSBuild Targets GitFlow Git Branch Version</tags>
     <developmentDependency>true</developmentDependency>
+    <minClientVersion>2.8</minClientVersion>
     <dependencies>
     </dependencies>
   </metadata>

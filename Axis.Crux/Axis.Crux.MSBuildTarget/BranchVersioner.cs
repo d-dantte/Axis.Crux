@@ -55,11 +55,13 @@ namespace Axis.Crux.MSBuildTarget
                 Options = new StreamReader(optionFile.OpenRead())
                     .Using(_reader => _reader.ReadToEnd())
                     .Pipe(JsonConvert.DeserializeObject<Options>);
+
+                Options.GitRoot = Options.GitRoot ?? Path.Combine(ProjectDirectory, "..");
             }
         }
 
         public void ExtractVersion()
-        => new Repository(new DirectoryInfo(Path.Combine(ProjectDirectory, "..")).FullName).Using(gitRepo =>
+        => new Repository(new DirectoryInfo(Options.GitRoot).FullName).Using(gitRepo =>
         {
             var solutionDirectory = new DirectoryInfo(Path.Combine(ProjectDirectory, ".."));
 
@@ -67,6 +69,7 @@ namespace Axis.Crux.MSBuildTarget
 
             //1. get the last release branch merged into master
             var monitored = gitRepo.Branches[Options.BuildBranch];
+
             Log.LogMessage($@"Git master branch found: {monitored?.FriendlyName ?? "null"}");
 
             var releases = gitRepo
@@ -92,16 +95,21 @@ namespace Axis.Crux.MSBuildTarget
                     })
                     .FirstOrDefault(_rr => _rr.Release != null);
 
-                Log.LogMessage($@"Release branch found: {recentRelease.Release?.FriendlyName ?? "null"}");
+                if (recentRelease == null) //wasn't merged with the monitored branch
+                    ReleaseSemVer = new SemVer($"0.0.0-pre-{now.ToString("yyyyMMdd")}-{milliseconds}");
+                else
+                {
+                    Log.LogMessage($@"Release branch found: {recentRelease.Release?.FriendlyName ?? "null"}");
 
 
-                //2. extract the version number from it
-                var releaseVersion = recentRelease.Release?.FriendlyName.Substring("origin/release-".Length);
+                    //2. extract the version number from it
+                    var releaseVersion = recentRelease.Release?.FriendlyName.Substring("origin/release-".Length);
 
-                if (PreReleaseVersion.IsMatch(releaseVersion))
-                    releaseVersion = $"{ReleaseVersionTrimmer.Match(releaseVersion).Value}-pre-{now.ToString("yyyyMMdd")}-{milliseconds}";
+                    if (PreReleaseVersion.IsMatch(releaseVersion))
+                        releaseVersion = $"{ReleaseVersionTrimmer.Match(releaseVersion).Value}-pre-{now.ToString("yyyyMMdd")}-{milliseconds}";
 
-                ReleaseSemVer = new SemVer(releaseVersion);
+                    ReleaseSemVer = new SemVer(releaseVersion);
+                }
             }
         });
 
