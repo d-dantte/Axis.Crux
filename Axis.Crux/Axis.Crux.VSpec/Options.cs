@@ -8,6 +8,7 @@ namespace Axis.Crux.VSpec
         public FileInclusion[] Includes { get; set; }
 
         public bool? IsAutoAssemblyCopyEnabled { get; set; } = true;
+        public bool? IsAutoDependencyCopyEnabled { get; set; } = true;
 
         public PackageVersion MostRecentVersion() => Versions?.LastOrDefault() ?? new PackageVersion { Version = SemVer.PreGenesis };
     }

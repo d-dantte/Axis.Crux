@@ -99,6 +99,38 @@ namespace Axis.Crux.VSpec
                         .Element("releaseNotes")
                         .Value = packageVersion.ReleaseNotes;
                 }
+                
+
+                //add dependencies from ProjectDirectory/package.config
+                var packageFile = new FileInfo(Path.Combine(ProjectDirectory, "package.config"));
+                if (packageFile.Exists && Options.IsAutoDependencyCopyEnabled != false)
+                { 
+                    var packageConfig = packageFile
+                        .OpenRead()
+                        .Using(XDocument.Load);
+
+                    var nuspecDependencies = nuspec
+                        .Element("package")
+                        .Element("metadata")
+                        .Element("dependencies");
+                    nuspecDependencies?.RemoveNodes();
+
+                    if (nuspecDependencies == null) nuspec
+                        .Element("package")
+                        .Element("metadata")
+                        .Add(nuspecDependencies = new XElement("dependencies"));
+
+                    packageConfig
+                        .Element("packages")
+                        .Elements("package")
+                        .Where(_elt => !bool.Parse(_elt.Attribute("developmentDependency")?.Value ?? "false"))
+                        .Select(_elt => new XElement(
+                            "dependency",
+                            new XAttribute("id", _elt.Attribute("id").Value),
+                            new XAttribute("version", _elt.Attribute("version").Value)
+                        ))
+                        .Pipe(_dependencies => nuspecDependencies.Add(_dependencies));
+                }
 
 
                 //add the library dll
