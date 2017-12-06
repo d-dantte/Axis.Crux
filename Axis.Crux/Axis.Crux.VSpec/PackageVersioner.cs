@@ -102,7 +102,7 @@ namespace Axis.Crux.VSpec
                 
 
                 //add dependencies from ProjectDirectory/package.config
-                var packageFile = new FileInfo(Path.Combine(ProjectDirectory, "package.config"));
+                var packageFile = new FileInfo(Path.Combine(ProjectDirectory, "packages.config"));
                 if (packageFile.Exists && Options.IsAutoDependencyCopyEnabled != false)
                 { 
                     var packageConfig = packageFile
