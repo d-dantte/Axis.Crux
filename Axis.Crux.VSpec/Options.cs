@@ -9,6 +9,7 @@ namespace Axis.Crux.VSpec
 
         public bool? IsAutoAssemblyCopyEnabled { get; set; } = true;
         public bool? IsAutoDependencyCopyEnabled { get; set; } = true;
+        public bool? IsCsprojDependencyLookupEnabled { get; set; } = false;
 
         public PackageVersion MostRecentVersion() => Versions?.LastOrDefault() ?? new PackageVersion { Version = SemVer.PreGenesis };
     }

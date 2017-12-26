@@ -11,6 +11,12 @@ namespace Axis.Crux.VSpec
             using (disposable)
                 return func(disposable);
         }
+        public static void Using<D>(this D disposable, Action<D> action)
+        where D : IDisposable
+        {
+            using (disposable)
+                action(disposable);
+        }
 
         public static R Pipe<V, R>(this V value, Func<V, R> pipe)
         {
