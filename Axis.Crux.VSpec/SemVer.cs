@@ -37,7 +37,7 @@ namespace Axis.Crux.VSpec
                 Major = uint.Parse(parts[0]);
                 Minor = uint.Parse(parts[1]);
                 Patch = uint.Parse(parts[2]);
-                Pre = $"{now.ToString("yyyyMMdd")}.{Pad(12, milliseconds)}";
+                Pre = $"{now.ToString("yyyyMMdd")}-{Pad(12, milliseconds)}";
             }
             else if (PreReleaseVersion.IsMatch(semver))
             {
@@ -63,7 +63,7 @@ namespace Axis.Crux.VSpec
         public string ToString(bool excludePre)
         {
             var version = $@"{Major}.{Minor}.{Patch}";
-            if (!excludePre && !string.IsNullOrWhiteSpace(Pre)) version += $"-pre.{Pre}";
+            if (!excludePre && !string.IsNullOrWhiteSpace(Pre)) version += $"-pre-{Pre}";
 
             return version;
         }
