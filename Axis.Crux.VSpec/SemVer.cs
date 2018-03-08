@@ -35,7 +35,7 @@ namespace Axis.Crux.VSpec
                 Major = uint.Parse(parts[0]);
                 Minor = uint.Parse(parts[1]);
                 Patch = uint.Parse(parts[2]);
-                Pre = $"{now.ToString("yyyyMMdd")}-{milliseconds}";
+                Pre = $"{now.ToString("yyyyMMdd")}.{milliseconds}";
             }
             else if (PreReleaseVersion.IsMatch(semver))
             {

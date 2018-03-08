@@ -52,7 +52,7 @@ namespace Axis.Crux.Test
             semver = new SemVer("1.2.32-pre-543564");
             Console.WriteLine(semver);
 
-            semver = new SemVer("1.2.32-pre.65456-6545-64-654356");
+            semver = new SemVer("1.2.32-pre.65456.6545-64-654356");
             Console.WriteLine(semver);
         }
 
