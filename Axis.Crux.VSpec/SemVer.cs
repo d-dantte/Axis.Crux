@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Axis.Crux.VSpec
@@ -35,7 +37,7 @@ namespace Axis.Crux.VSpec
                 Major = uint.Parse(parts[0]);
                 Minor = uint.Parse(parts[1]);
                 Patch = uint.Parse(parts[2]);
-                Pre = $"{now.ToString("yyyyMMdd")}.{milliseconds}";
+                Pre = $"{now.ToString("yyyyMMdd")}.{Pad(12, milliseconds)}";
             }
             else if (PreReleaseVersion.IsMatch(semver))
             {
@@ -67,5 +69,22 @@ namespace Axis.Crux.VSpec
         }
 
         public static SemVer Parse(string semver) => new SemVer(semver);
+
+        private static string Pad(int digitPlaces, double value)
+        {
+            var svalue = value.ToString();
+            var diff = digitPlaces - svalue.Length;
+            if (diff < 0) return svalue;
+            else return $"{Zeros(diff)}{svalue}";
+        }
+
+        private static string Zeros(int count)
+        {
+            var sbuff = new StringBuilder();
+            for (int cnt = 0; cnt < count; cnt++)
+                sbuff.Append("0");
+
+            return sbuff.ToString();
+        }
     }
 }
