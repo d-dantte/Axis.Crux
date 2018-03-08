@@ -7,8 +7,8 @@ namespace Axis.Crux.VSpec
     {
         public static readonly Regex ReleaseVersion = new Regex(@"^\d+(\.\d+){2}$");
         public static readonly Regex PreReleaseIndicator = new Regex(@"^\d+(\.\d+){2}-pre(release)?$", RegexOptions.IgnoreCase);
-        public static readonly Regex PreReleaseVersionPrefix = new Regex(@"^\d+(\.\d+){2}-pre(release)?-", RegexOptions.IgnoreCase);
-        public static readonly Regex PreReleaseVersion = new Regex(@"^\d+(\.\d+){2}-pre(release)?-\d[-\d]+$", RegexOptions.IgnoreCase);
+        public static readonly Regex PreReleaseVersionPrefix = new Regex(@"^\d+(\.\d+){2}-pre(release)?[-\.]", RegexOptions.IgnoreCase);
+        public static readonly Regex PreReleaseVersion = new Regex(@"^\d+(\.\d+){2}-pre(release)?[-\.]\d[-\.\d]+$", RegexOptions.IgnoreCase);
 
         public static readonly SemVer Genesis = new SemVer("0.0.0");
         public static readonly SemVer PreGenesis = new SemVer("0.0.0-pre");
@@ -61,7 +61,7 @@ namespace Axis.Crux.VSpec
         public string ToString(bool excludePre)
         {
             var version = $@"{Major}.{Minor}.{Patch}";
-            if (!excludePre && !string.IsNullOrWhiteSpace(Pre)) version += $"-pre-{Pre}";
+            if (!excludePre && !string.IsNullOrWhiteSpace(Pre)) version += $"-pre.{Pre}";
 
             return version;
         }
