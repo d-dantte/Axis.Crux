@@ -21,6 +21,7 @@ namespace Axis.Crux.VSpec
                 new SemVerConverter()
             }
         };
+
         public static readonly Regex CsProjPattern = new Regex("\\.csproj$");
 
 

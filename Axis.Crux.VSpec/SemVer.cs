@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -7,9 +8,10 @@ namespace Axis.Crux.VSpec
     public class SemVer
     {
         public static readonly Regex ReleaseVersion = new Regex(@"^\d+(\.\d+){2}$");
-        public static readonly Regex PreReleaseIndicator = new Regex(@"^\d+(\.\d+){2}-pre(release)?$", RegexOptions.IgnoreCase);
-        public static readonly Regex PreReleaseVersionPrefix = new Regex(@"^\d+(\.\d+){2}-pre(release)?[-\.]", RegexOptions.IgnoreCase);
-        public static readonly Regex PreReleaseVersion = new Regex(@"^\d+(\.\d+){2}-pre(release)?[-\.]\d[-\.\d]+$", RegexOptions.IgnoreCase);
+        public static readonly Regex ReleaseVersionMatcher = new Regex(@"^\d+(\.\d+){2}");
+        public static readonly Regex PreReleaseLabeled = new Regex(@"^\d+(\.\d+){2}-[\w]+$", RegexOptions.IgnoreCase);
+        public static readonly Regex PreReleaseWildcardLabeled = new Regex(@"^\d+(\.\d+){2}-[\w]+-\*$", RegexOptions.IgnoreCase);
+        public static readonly Regex PreReleaseVersion = new Regex(@"^\d+(\.\d+){2}-[\w-]+(\.[\w-]+)*$", RegexOptions.IgnoreCase);
 
         public static readonly SemVer Genesis = new SemVer("0.0.0");
         public static readonly SemVer PreGenesis = new SemVer("0.0.0-pre");
@@ -26,7 +28,7 @@ namespace Axis.Crux.VSpec
                 Minor = uint.Parse(parts[1]);
                 Patch = uint.Parse(parts[2]);
             }
-            else if (PreReleaseIndicator.IsMatch(semver))
+            else if (PreReleaseLabeled.IsMatch(semver))
             {
                 var parts = semver.Split('.', '-');
 
@@ -36,7 +38,19 @@ namespace Axis.Crux.VSpec
                 Major = uint.Parse(parts[0]);
                 Minor = uint.Parse(parts[1]);
                 Patch = uint.Parse(parts[2]);
-                Pre = $"{now.ToString("yyyyMMdd")}-{Pad(12, milliseconds)}";
+                Pre = parts[3];
+            }
+            else if (PreReleaseWildcardLabeled.IsMatch(semver))
+            {
+                var parts = semver.Split('.', '-');
+
+                var now = DateTime.Now;
+                var milliseconds = new TimeSpan(0, now.Hour, now.Minute, now.Second, now.Millisecond).TotalMilliseconds;
+
+                Major = uint.Parse(parts[0]);
+                Minor = uint.Parse(parts[1]);
+                Patch = uint.Parse(parts[2]);
+                Pre = $"{parts[3]}-{now:yyyyMMdd}-{Pad(12, milliseconds)}";
             }
             else if (PreReleaseVersion.IsMatch(semver))
             {
@@ -45,9 +59,11 @@ namespace Axis.Crux.VSpec
                 Major = uint.Parse(parts[0]);
                 Minor = uint.Parse(parts[1]);
                 Patch = uint.Parse(parts[2]);
-                Pre = semver.Replace(PreReleaseVersionPrefix.Match(semver).Value, "");
+                Pre = semver
+                    .Replace(ReleaseVersionMatcher.Match(semver).Value, "")
+                    .TrimStart('-');
             }
-            else throw new Exception("invalid SemVer format");
+            else throw new Exception($"Invalid SemVer Format: {semver}");
         }
 
         
@@ -62,7 +78,7 @@ namespace Axis.Crux.VSpec
         public string ToString(bool excludePre)
         {
             var version = $@"{Major}.{Minor}.{Patch}";
-            if (!excludePre && !string.IsNullOrWhiteSpace(Pre)) version += $"-pre-{Pre}";
+            if (!excludePre && !string.IsNullOrWhiteSpace(Pre)) version += $"-{Pre}";
 
             return version;
         }
@@ -71,19 +87,117 @@ namespace Axis.Crux.VSpec
 
         private static string Pad(int digitPlaces, double value)
         {
-            var svalue = value.ToString();
-            var diff = digitPlaces - svalue.Length;
-            if (diff < 0) return svalue;
-            else return $"{Zeros(diff)}{svalue}";
+            var stringValue = value.ToString(CultureInfo.InvariantCulture);
+            var diff = digitPlaces - stringValue.Length;
+            return diff < 0 ? stringValue : $"{Zeros(diff)}{stringValue}";
         }
 
         private static string Zeros(int count)
         {
-            var sbuff = new StringBuilder();
-            for (int cnt = 0; cnt < count; cnt++)
-                sbuff.Append("0");
+            var stringBuilder = new StringBuilder();
+            for (var cnt = 0; cnt < count; cnt++)
+                stringBuilder.Append("0");
 
-            return sbuff.ToString();
+            return stringBuilder.ToString();
         }
+    }
+
+    public enum SemVerBoundaryType
+    {
+        Inclusive,
+        Exclusive
+    }
+
+    public class Boundary
+    {
+        public SemVer Version { get; set; }
+        public SemVerBoundaryType BoundaryType { get; set; }
+    }
+
+    public class SemVerRange
+    {
+        public static readonly Regex PreReleaseVersion = 
+            new Regex(@"^[\(\[]?\d+(\.\d+){2}-[\w-]+(\.[\w-]+)(,)?[\)\]]$", RegexOptions.IgnoreCase);
+
+        public Boundary LowerBound { get; set; }
+        public Boundary UpperBound { get; set; }
+
+        public static SemVerRange Parse(string semver)
+        {
+            if (string.IsNullOrWhiteSpace(semver))
+                throw new Exception($"Invalid SemVer Range {semver}");
+
+            if (!((HasValidRangeLowerBound(semver) && HasValidRangeUpperBound(semver))
+                  || (!HasValidRangeUpperBound(semver) && !HasValidRangeLowerBound(semver))))
+                throw new Exception($"Invalid SemVer Range {semver}");
+
+            var parts = semver.Split(',');
+
+            switch (parts.Length)
+            {
+                case 1:
+                {
+                    if(HasExclusiveUpperBound(parts[0])|| HasExclusiveLowerBound(parts[0]))
+                        throw new Exception($"Invalid SemVer Range {semver}");
+
+                    var lowerBoundary = new Boundary
+                    {
+                        BoundaryType = SemVerBoundaryType.Inclusive,
+                        Version = SemVer.Parse(parts[0].TrimStart('[', ']'))
+                    };
+
+                    var upperBoundary = new Boundary
+                    {
+                        BoundaryType = !HasValidRangeUpperBound(parts[0])?
+                            SemVerBoundaryType.Exclusive: SemVerBoundaryType.Inclusive,
+                        Version = lowerBoundary.Version
+                    };
+
+                    return new SemVerRange
+                    {
+                        LowerBound = lowerBoundary,
+                        UpperBound = upperBoundary
+                    };
+                }
+
+                case 2:
+                {
+                    var rawVersionLower = parts[0].TrimStart('[', '(');
+                    var rawVersionUpper = parts[1].TrimStart(']', ')');
+
+                    return new SemVerRange
+                    {
+                        LowerBound = new Boundary
+                        {
+                            BoundaryType = !HasExclusiveLowerBound(parts[0])
+                                ? SemVerBoundaryType.Exclusive
+                                : SemVerBoundaryType.Inclusive,
+                            Version = string.IsNullOrWhiteSpace(rawVersionLower) ? null : new SemVer(rawVersionLower)
+                        },
+                        UpperBound = new Boundary
+                        {
+                            BoundaryType = !HasExclusiveUpperBound(parts[1])
+                                ? SemVerBoundaryType.Exclusive
+                                : SemVerBoundaryType.Inclusive,
+                            Version = string.IsNullOrWhiteSpace(rawVersionUpper) ? null : new SemVer(rawVersionUpper)
+                        }
+                    };
+                }
+
+                default:
+                    throw new Exception($"Invalid SemVer Range {semver}");
+            }
+        }
+
+        public static bool HasExclusiveLowerBound(string @string) => @string.StartsWith("(");
+        public static bool HasInclusiveLowerBound(string @string) => @string.StartsWith("[");
+
+        public static bool HasExclusiveUpperBound(string @string) => @string.StartsWith(")");
+        public static bool HasInclusiveUpperBound(string @string) => @string.StartsWith("]");
+
+        public static bool HasValidRangeLowerBound(string @string)
+        => HasExclusiveLowerBound(@string) || HasInclusiveLowerBound(@string);
+        public static bool HasValidRangeUpperBound(string @string)
+        => HasExclusiveUpperBound(@string) || HasInclusiveUpperBound(@string);
     }
 }
