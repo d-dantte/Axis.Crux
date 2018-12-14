@@ -54,108 +54,114 @@ namespace Axis.Crux.VSpec
             {
                 Versions = new[]
                 {
-                    new PackageVersion{ Version = SemVer.PreGenesis }
+                    new PackageVersion
+                    {
+                        Version = new SemVerRange(SemVer.PreGenesis.ToString())
+                    }
                 }
             };
             else
             {
                 Options = new StreamReader(optionFile.OpenRead())
-                    .Using(_reader => _reader.ReadToEnd())
-                    .Pipe(_v => JsonConvert.DeserializeObject<Options>(_v, JsonSerializerSettings));
+                    .Using(reader => reader.ReadToEnd())
+                    .Pipe(value => JsonConvert.DeserializeObject<Options>(value, JsonSerializerSettings));
             }
         }
 
         public void UpdateNuspec()
         {
             var nuspecFile = new FileInfo(Path.Combine(ProjectDirectory, $"{ProjectName}.nuspec"));
-            if (nuspecFile.Exists)
+
+            if (!nuspecFile.Exists) return;
+
+            var nuspec = nuspecFile
+                .OpenRead()
+                .Using(XDocument.Load);
+            Log.LogMessage($"Nuspec file found!");
+
+            #region Nuspec ID
+
+            //update the Id
+            Log.LogMessage($"Updating nuspec Id...");
+            nuspec
+                .Element("package")
+                .Element("metadata")
+                .Element("id")
+                .Value = ProjectName;
+
+            #endregion
+
+            #region Nuspec Version
+
+            //update the version
+            Log.LogMessage($"Updating version...");
+            var packageVersion = Options.MostRecentVersion();
+            nuspec
+                .Element("package")
+                .Element("metadata")
+                .Element("version")
+                .Value = packageVersion.Version.ToString();
+
+            #endregion
+
+            #region Nuspec Release Notes
+
+            //update release notes if available
+            if (!string.IsNullOrWhiteSpace(packageVersion.ReleaseNotes))
             {
-                var nuspec = nuspecFile
+                Log.LogMessage($"Updating release notes...");
+                nuspec
+                    .Element("package")
+                    .Element("metadata")
+                    .Element("releaseNotes")
+                    .Value = packageVersion.ReleaseNotes;
+            }
+
+            #endregion
+
+            #region Nuspec Dependencies
+
+            var nuspecDependencies = nuspec
+                .Element("package")
+                .Element("metadata")
+                .Element("dependencies");
+            nuspecDependencies?.RemoveNodes();
+
+            if (nuspecDependencies == null) nuspec
+                .Element("package")
+                .Element("metadata")
+                .Add(nuspecDependencies = new XElement("dependencies"));
+
+            //add dependencies from ProjectDirectory/package.config
+            var packageFile = new FileInfo(Path.Combine(ProjectDirectory, "packages.config"));
+            if (packageFile.Exists && Options.IsAutoDependencyCopyEnabled != false)
+            { 
+                var packageConfig = packageFile
                     .OpenRead()
                     .Using(XDocument.Load);
-                Log.LogMessage($"Nuspec file found!");
 
-                #region Nuspec ID
+                packageConfig
+                    .Element("packages")
+                    .Elements("package")
+                    .Where(_elt => !bool.Parse(_elt.Attribute("developmentDependency")?.Value ?? "false"))
+                    .Select(_elt => new XElement(
+                        "dependency",
+                        new XAttribute("id", _elt.Attribute("id").Value),
+                        new XAttribute("version", _elt.Attribute("version").Value)
+                    ))
+                    .Pipe(nuspecDependencies.Add);
+            }
 
-                //update the Id
-                Log.LogMessage($"Updating nuspec Id...");
-                nuspec
-                    .Element("package")
-                    .Element("metadata")
-                    .Element("id")
-                    .Value = ProjectName;
-
-                #endregion
-
-                #region Nuspec Version
-
-                //update the version
-                Log.LogMessage($"Updating version...");
-                var packageVersion = Options.MostRecentVersion();
-                nuspec
-                    .Element("package")
-                    .Element("metadata")
-                    .Element("version")
-                    .Value = packageVersion.Version.ToString();
-
-                #endregion
-
-                #region Nuspec Release Notes
-
-                //update release notes if available
-                if (!string.IsNullOrWhiteSpace(packageVersion.ReleaseNotes))
+            //add dependencies form .csproj project dependencies that have nuspec files
+            var csprojFile = new FileInfo(Path.Combine(ProjectDirectory, $"{ProjectName}.csproj"));
+            if (csprojFile.Exists)
+            {
+                var xdoc = csprojFile
+                    .OpenRead()
+                    .Using(XDocument.Load);
+                
+                if (Options.IsCsprojProjectDependencyLookupEnabled == true)
                 {
-                    Log.LogMessage($"Updating release notes...");
-                    nuspec
-                        .Element("package")
-                        .Element("metadata")
-                        .Element("releaseNotes")
-                        .Value = packageVersion.ReleaseNotes;
-                }
-
-                #endregion
-
-                #region Nuspec Dependencies
-
-                var nuspecDependencies = nuspec
-                    .Element("package")
-                    .Element("metadata")
-                    .Element("dependencies");
-                nuspecDependencies?.RemoveNodes();
-
-                if (nuspecDependencies == null) nuspec
-                    .Element("package")
-                    .Element("metadata")
-                    .Add(nuspecDependencies = new XElement("dependencies"));
-
-                //add dependencies from ProjectDirectory/package.config
-                var packageFile = new FileInfo(Path.Combine(ProjectDirectory, "packages.config"));
-                if (packageFile.Exists && Options.IsAutoDependencyCopyEnabled != false)
-                { 
-                    var packageConfig = packageFile
-                        .OpenRead()
-                        .Using(XDocument.Load);
-
-                    packageConfig
-                        .Element("packages")
-                        .Elements("package")
-                        .Where(_elt => !bool.Parse(_elt.Attribute("developmentDependency")?.Value ?? "false"))
-                        .Select(_elt => new XElement(
-                            "dependency",
-                            new XAttribute("id", _elt.Attribute("id").Value),
-                            new XAttribute("version", _elt.Attribute("version").Value)
-                        ))
-                        .Pipe(nuspecDependencies.Add);
-                }
-
-                //add dependencies form .csproj project dependencies that have nuspec files
-                var csprojFile = new FileInfo(Path.Combine(ProjectDirectory, $"{ProjectName}.csproj"));
-                if (csprojFile.Exists && Options.IsCsprojDependencyLookupEnabled == true)
-                {
-                    var xdoc = csprojFile
-                        .OpenRead()
-                        .Using(XDocument.Load);
-
                     var @namespace = xdoc.Root.Name.Namespace;
 
                     //get all project-references... 
@@ -168,50 +174,66 @@ namespace Axis.Crux.VSpec
                         .Where(IsNewDependency(nuspecDependencies)) //then filter out existing dependencies
                         .Pipe(nuspecDependencies.Add); //add "new" dependency nodes to our nuspec dependencies
                 }
-                #endregion
-
-                #region Nuspec File includes
-
-                Log.LogMessage($"Updating included files...");
-                var nuspecFiles = nuspec
-                    .Element("package")
-                    .Element("files");
-                nuspecFiles?.RemoveNodes();
-
-                if (nuspecFiles == null)
-                    nuspec.Element("package").Add(nuspecFiles = new XElement("files"));
-
-                //add the library dll
-                if (Options.Includes?.Length > 0)
+                else if (Options.IsCsprojPackageDependencyLookupEnabled == true)
                 {
-                    Options.Includes
-                        .Select(_include =>
-                        {
-                            var file = new XElement("file");
-                            file.Add(new XAttribute("src", ResolveParams(_include.Source)),
-                                     new XAttribute("target", ResolveParams(_include.TargetPath)));
-                            if (!string.IsNullOrWhiteSpace(_include.Exclude))
-                                file.Add(new XAttribute("exclude", ResolveParams(_include.Exclude)));
+                    var @namespace = xdoc.Root.Name.Namespace;
 
-                            return file;
-                        })
-                        .Pipe(_files => nuspecFiles.Add(_files.ToArray()));
+                    //get all package-references... 
+                    xdoc.Root
+                        .Elements(@namespace + "ItemGroup")
+                        .SelectMany(_itemGroup => _itemGroup.Elements())
+                        .Where(IsPackageReference)
+                        .Select(TranslateToNuspecDependency) //extract the nuspec identity (nuspec id & version) as a nuspec dependency node
+                        .Where(IsNewDependency(nuspecDependencies)) //then filter out existing dependencies
+                        .Pipe(nuspecDependencies.Add); //add "new" dependency nodes to our nuspec dependencies
                 }
 
-                //finally, include the project's dll if auto-copy is not enabled
-                if (Options.IsAutoAssemblyCopyEnabled != false)
-                {
-                    var dll = new XElement("file");
-                    dll.Add(new XAttribute("src", $@"{OutputPath}{AssemblyName}.dll"),
-                            new XAttribute("target", "lib"));
-                    nuspecFiles.Add(dll);
-                }
-
-                #endregion
-
-                Log.LogMessage($"Exporting {ProjectName}.nuspec file...");
-                nuspec.Save(nuspecFile.FullName);
+                else throw new Exception("Invalid .csproj");
             }
+
+            #endregion
+
+            #region Nuspec File includes
+
+            Log.LogMessage($"Updating included files...");
+            var nuspecFiles = nuspec
+                .Element("package")
+                .Element("files");
+            nuspecFiles?.RemoveNodes();
+
+            if (nuspecFiles == null)
+                nuspec.Element("package").Add(nuspecFiles = new XElement("files"));
+
+            //add the library dll
+            if (Options.Includes?.Length > 0)
+            {
+                Options.Includes
+                    .Select(_include =>
+                    {
+                        var file = new XElement("file");
+                        file.Add(new XAttribute("src", ResolveParams(_include.Source)),
+                            new XAttribute("target", ResolveParams(_include.TargetPath)));
+                        if (!string.IsNullOrWhiteSpace(_include.Exclude))
+                            file.Add(new XAttribute("exclude", ResolveParams(_include.Exclude)));
+
+                        return file;
+                    })
+                    .Pipe(_files => nuspecFiles.Add(_files.ToArray()));
+            }
+
+            //finally, include the project's dll if auto-copy is not enabled
+            if (Options.IsAutoAssemblyCopyEnabled != false)
+            {
+                var dll = new XElement("file");
+                dll.Add(new XAttribute("src", $@"{OutputPath}{AssemblyName}.dll"),
+                    new XAttribute("target", "lib"));
+                nuspecFiles.Add(dll);
+            }
+
+            #endregion
+
+            Log.LogMessage($"Exporting {ProjectName}.nuspec file...");
+            nuspec.Save(nuspecFile.FullName);
         }
 
         public string ResolveParams(string value)
@@ -224,16 +246,20 @@ namespace Axis.Crux.VSpec
                 .Replace($"$({nameof(BuildConfiguration)})", BuildConfiguration);
         }
 
-        private bool IsProjectReference(XElement element)
+        private static bool IsProjectReference(XElement element)
         {
             return element.Name == element.Name.Namespace + "ProjectReference";
         }
-        private bool ProjectRefHasNuspec(XElement projectReference)
+        private static bool IsPackageReference(XElement element)
+        {
+            return element.Name == element.Name.Namespace + "PackageReference";
+        }
+        private static bool ProjectRefHasNuspec(XElement projectReference)
         {
             var finfo = new FileInfo(CsProjPattern.Replace(projectReference.Attribute("Include").Value, ".nuspec"));            
             return finfo.Exists;
         }
-        private XElement ExtractNuspecIdentityFromProjectRef(XElement projectReference)
+        private static XElement ExtractNuspecIdentityFromProjectRef(XElement projectReference)
         {
             var nuspec = new FileInfo(CsProjPattern.Replace(projectReference.Attribute("Include").Value, ".nuspec"))
                 .OpenRead()
@@ -249,15 +275,23 @@ namespace Axis.Crux.VSpec
                 new XAttribute("version", metadata.Element("version").Value)
             );
         }
-        private Func<XElement, bool> IsNewDependency(XElement nuspecDependencies)
+
+        private static XElement TranslateToNuspecDependency(XElement packageReference)
         {
-            return _dependency => nuspecDependencies
+            return new XElement(
+                "dependency",
+                new XAttribute("id", packageReference.Attribute("Include").Value),
+                new XAttribute("version", packageReference.Attribute("Version").Value));
+        }
+        private static Func<XElement, bool> IsNewDependency(XElement nuspecDependencies)
+        {
+            return (dependency) => nuspecDependencies
                 .Elements("dependency")
-                .All(_nuspecDep => _nuspecDep.Attribute("id").Value != _dependency.Attribute("id").Value);
+                .All(nuspecDep => nuspecDep.Attribute("id").Value != dependency.Attribute("id").Value);
         }
 
 
-        private static string _LogFileName = $"Log-{DateTime.Now.Ticks}.txt";
+        private static readonly string _LogFileName = $"Log-{DateTime.Now.Ticks}.txt";
         private void __log(object value)
         {
             new FileStream(_LogFileName, FileMode.Append)

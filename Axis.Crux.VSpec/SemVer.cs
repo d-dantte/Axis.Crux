@@ -122,7 +122,7 @@ namespace Axis.Crux.VSpec
         public Boundary LowerBound { get; set; }
         public Boundary UpperBound { get; set; }
 
-        public static SemVerRange Parse(string semver)
+        public SemVerRange(string semver)
         {
             if (string.IsNullOrWhiteSpace(semver))
                 throw new Exception($"Invalid SemVer Range {semver}");
@@ -137,51 +137,48 @@ namespace Axis.Crux.VSpec
             {
                 case 1:
                 {
-                    if(HasExclusiveUpperBound(parts[0])|| HasExclusiveLowerBound(parts[0]))
+                    if (HasExclusiveUpperBound(parts[0]) || HasExclusiveLowerBound(parts[0]))
                         throw new Exception($"Invalid SemVer Range {semver}");
 
                     var lowerBoundary = new Boundary
                     {
                         BoundaryType = SemVerBoundaryType.Inclusive,
-                        Version = SemVer.Parse(parts[0].TrimStart('[', ']'))
+                        Version = SemVer.Parse(parts[0].Trim('[', ']'))
                     };
 
                     var upperBoundary = new Boundary
                     {
-                        BoundaryType = !HasValidRangeUpperBound(parts[0])?
-                            SemVerBoundaryType.Exclusive: SemVerBoundaryType.Inclusive,
+                        BoundaryType = !HasValidRangeUpperBound(parts[0])
+                            ? SemVerBoundaryType.Exclusive
+                            : SemVerBoundaryType.Inclusive,
                         Version = lowerBoundary.Version
                     };
 
-                    return new SemVerRange
-                    {
-                        LowerBound = lowerBoundary,
-                        UpperBound = upperBoundary
-                    };
+                    LowerBound = lowerBoundary;
+                    UpperBound = upperBoundary;
+                    return;
                 }
 
                 case 2:
                 {
                     var rawVersionLower = parts[0].TrimStart('[', '(');
-                    var rawVersionUpper = parts[1].TrimStart(']', ')');
+                    var rawVersionUpper = parts[1].TrimEnd(']', ')');
 
-                    return new SemVerRange
+                    LowerBound = new Boundary
                     {
-                        LowerBound = new Boundary
-                        {
-                            BoundaryType = !HasExclusiveLowerBound(parts[0])
-                                ? SemVerBoundaryType.Exclusive
-                                : SemVerBoundaryType.Inclusive,
-                            Version = string.IsNullOrWhiteSpace(rawVersionLower) ? null : new SemVer(rawVersionLower)
-                        },
-                        UpperBound = new Boundary
-                        {
-                            BoundaryType = !HasExclusiveUpperBound(parts[1])
-                                ? SemVerBoundaryType.Exclusive
-                                : SemVerBoundaryType.Inclusive,
-                            Version = string.IsNullOrWhiteSpace(rawVersionUpper) ? null : new SemVer(rawVersionUpper)
-                        }
+                        BoundaryType = HasExclusiveLowerBound(parts[0])
+                            ? SemVerBoundaryType.Exclusive
+                            : SemVerBoundaryType.Inclusive,
+                        Version = string.IsNullOrWhiteSpace(rawVersionLower) ? null : new SemVer(rawVersionLower)
                     };
+                    UpperBound = new Boundary
+                    {
+                        BoundaryType = HasExclusiveUpperBound(parts[1])
+                            ? SemVerBoundaryType.Exclusive
+                            : SemVerBoundaryType.Inclusive,
+                        Version = string.IsNullOrWhiteSpace(rawVersionUpper) ? null : new SemVer(rawVersionUpper)
+                    };
+                    return;
                 }
 
                 default:
@@ -189,15 +186,54 @@ namespace Axis.Crux.VSpec
             }
         }
 
+        public static SemVerRange Parse(string semver)
+        {
+            return new SemVerRange(semver);
+        }
+
+        public override string ToString()
+        {
+            var value =  $"{LowerBoundarySymbol(LowerBound.BoundaryType)}{LowerBound.Version}";
+            if (!string.Equals(
+                UpperBound.Version?.ToString(), 
+                LowerBound.Version?.ToString(),
+                StringComparison.InvariantCulture))
+            {
+                value = $"{value},{UpperBound.Version}{UpperBoundarySymbol(UpperBound.BoundaryType)}";
+            }
+            else if(LowerBound.BoundaryType == SemVerBoundaryType.Inclusive)
+            {
+                value = UpperBound.BoundaryType == SemVerBoundaryType.Exclusive ? 
+                    value.TrimStart('[') : 
+                    $"{value}{UpperBoundarySymbol(SemVerBoundaryType.Inclusive)}";
+            }
+            else
+            {
+                value = $"{value},{UpperBound.Version}{UpperBoundarySymbol(UpperBound.BoundaryType)}";
+            }
+
+            return value;
+        }
+
         public static bool HasExclusiveLowerBound(string @string) => @string.StartsWith("(");
         public static bool HasInclusiveLowerBound(string @string) => @string.StartsWith("[");
 
-        public static bool HasExclusiveUpperBound(string @string) => @string.StartsWith(")");
-        public static bool HasInclusiveUpperBound(string @string) => @string.StartsWith("]");
+        public static bool HasExclusiveUpperBound(string @string) => @string.EndsWith(")");
+        public static bool HasInclusiveUpperBound(string @string) => @string.EndsWith("]");
 
         public static bool HasValidRangeLowerBound(string @string)
         => HasExclusiveLowerBound(@string) || HasInclusiveLowerBound(@string);
         public static bool HasValidRangeUpperBound(string @string)
         => HasExclusiveUpperBound(@string) || HasInclusiveUpperBound(@string);
+
+        public static char LowerBoundarySymbol(SemVerBoundaryType type)
+        => type == SemVerBoundaryType.Inclusive ? '[' :
+           type == SemVerBoundaryType.Exclusive ? '(' :
+           throw new Exception($"Invalid Boundary Type: {type}");
+
+        public static char UpperBoundarySymbol(SemVerBoundaryType type)
+        => type == SemVerBoundaryType.Inclusive ? ']' :
+           type == SemVerBoundaryType.Exclusive ? ')' :
+           throw new Exception($"Invalid Boundary Type: {type}");
     }
 }

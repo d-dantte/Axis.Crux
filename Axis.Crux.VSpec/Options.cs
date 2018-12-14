@@ -21,16 +21,27 @@ namespace Axis.Crux.VSpec
 
         /// <summary>
         /// Determines if dependencies should be written by the package versioner task into the nuspec
-        /// file. With this flag, Dependencies are gathered from .csproj files (.net Framework/standard/core projects)
+        /// file. With this flag, Dependencies are gathered from the "PackageReference" in the.csproj files
+        /// (.net standard/core projects)
         /// </summary>
-        public bool? IsCsprojDependencyLookupEnabled { get; set; } = false;
+        public bool? IsCsprojPackageDependencyLookupEnabled { get; set; } = false;
 
-        public PackageVersion MostRecentVersion() => Versions?.LastOrDefault() ?? new PackageVersion { Version = SemVer.PreGenesis };
+        /// <summary>
+        /// Determines if dependencies should be written by the package versioner task into the nuspec
+        /// file. With this flag, Dependencies are gathered from the "project reference" int the .csproj files
+        /// (.net Framework/standard/core projects)
+        /// </summary>
+        public bool? IsCsprojProjectDependencyLookupEnabled { get; set; } = false;
+
+        public PackageVersion MostRecentVersion() => Versions?.LastOrDefault() ?? new PackageVersion
+        {
+            Version = new SemVerRange(SemVer.PreGenesis.ToString())
+        };
     }
 
     public class PackageVersion
     {
-        public SemVer Version { get; set; }
+        public SemVerRange Version { get; set; }
         public string ReleaseNotes { get; set; }
 
         //other version specific stuff can come here
